@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QCARConfig>
+  <Tracking>
+    <ImageTarget name="puntadewa" size="0.085000 0.113839" />
+    <ImageTarget name="petruk" size="0.085000 0.113839" />
+    <ImageTarget name="hanoman" size="0.085000 0.113839" />
+    <ImageTarget name="gatotkaca" size="0.085000 0.113839" />
+    <ImageTarget name="kresna" size="0.085000 0.113839" />
+    <ImageTarget name="bagong" size="0.085000 0.113839" />
+    <ImageTarget name="bima" size="0.085000 0.113839" />
+    <ImageTarget name="arjuna" size="0.085000 0.113839" />
+    <ImageTarget name="semar" size="0.085000 0.113839" />
+  </Tracking>
+</QCARConfig>
