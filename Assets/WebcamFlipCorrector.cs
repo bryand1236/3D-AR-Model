@@ -226,6 +226,15 @@ public class WebcamFlipCorrector : MonoBehaviour
         }
     }
 
+    public void ToggleHorizontalFlip()
+    {
+        flipHorizontal = !flipHorizontal;
+        ApplyVideoBackgroundFlip();
+#if UNITY_EDITOR
+        UpdateAllTargetPoses(isRawUpdateFromVuforia: false, forceReapply: true);
+#endif
+    }
+
     public void ApplyVideoBackgroundFlip()
     {
         if (videoBackgroundTransform == null)

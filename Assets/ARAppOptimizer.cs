@@ -1,9 +1,11 @@
 using UnityEngine;
+using Vuforia;
 
 /// <summary>
 /// Sets up optimal mobile AR performance parameters on application launch:
 /// - Locks target frame rate to 60 FPS for fluid AR tracking without thermal throttling.
 /// - Disables screen sleep timeout so the AR experience does not dim or sleep while aiming at cards.
+/// - Configures continuous autofocus for Vuforia camera tracking on mobile devices.
 /// </summary>
 public class ARAppOptimizer : MonoBehaviour
 {
@@ -13,6 +15,9 @@ public class ARAppOptimizer : MonoBehaviour
 
     [Tooltip("Prevent device from sleeping during AR tracking.")]
     public bool preventScreenSleep = true;
+
+    [Tooltip("Enable continuous camera autofocus for robust AR tracking.")]
+    public bool continuousAutofocus = true;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void InitializeOnLoad()
@@ -27,6 +32,24 @@ public class ARAppOptimizer : MonoBehaviour
         ApplySettings();
     }
 
+    void OnEnable()
+    {
+        VuforiaApplication.Instance.OnVuforiaStarted += OnVuforiaStarted;
+    }
+
+    void OnDisable()
+    {
+        VuforiaApplication.Instance.OnVuforiaStarted -= OnVuforiaStarted;
+    }
+
+    private void OnVuforiaStarted()
+    {
+        if (continuousAutofocus && VuforiaBehaviour.Instance != null && VuforiaBehaviour.Instance.CameraDevice != null)
+        {
+            VuforiaBehaviour.Instance.CameraDevice.SetFocusMode(FocusMode.FOCUS_MODE_CONTINUOUSAUTO);
+        }
+    }
+
     public void ApplySettings()
     {
         QualitySettings.vSyncCount = 0;
@@ -35,6 +58,11 @@ public class ARAppOptimizer : MonoBehaviour
         if (preventScreenSleep)
         {
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
+        }
+
+        if (continuousAutofocus && VuforiaBehaviour.Instance != null && VuforiaBehaviour.Instance.CameraDevice != null)
+        {
+            VuforiaBehaviour.Instance.CameraDevice.SetFocusMode(FocusMode.FOCUS_MODE_CONTINUOUSAUTO);
         }
     }
 }

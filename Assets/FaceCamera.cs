@@ -16,6 +16,23 @@ public class FaceCamera : MonoBehaviour
     private static Camera cachedMainCamera;
     private static Transform cachedMainCameraTransform;
 
+    private Renderer cachedRenderer;
+    private bool hasCachedRenderer = false;
+
+    private bool IsTargetVisible()
+    {
+        if (!hasCachedRenderer)
+        {
+            cachedRenderer = GetComponent<Renderer>();
+            if (cachedRenderer == null)
+            {
+                cachedRenderer = GetComponentInChildren<Renderer>(true);
+            }
+            hasCachedRenderer = true;
+        }
+        return cachedRenderer == null || cachedRenderer.enabled;
+    }
+
     public static Transform MainCameraTransform
     {
         get
@@ -52,6 +69,12 @@ public class FaceCamera : MonoBehaviour
 
     protected virtual void LateUpdate()
     {
+        // Skip calculations if the card/model is not currently tracked by Vuforia
+        if (!IsTargetVisible())
+        {
+            return;
+        }
+
         // Smoothly float up and down
         if (floatAmplitude > 0f)
         {

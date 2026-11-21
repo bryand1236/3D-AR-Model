@@ -59,6 +59,23 @@ public class LanguageSwitcher : MonoBehaviour
     public bool isLanguage2 => currentLanguageIndex == 2; // Aksara Jawa active
 
     private Camera cachedCamera;
+    private Renderer cachedRenderer;
+    private bool hasCachedRenderer = false;
+    private static readonly RaycastHit[] s_RaycastHits = new RaycastHit[16];
+
+    private bool IsVisible()
+    {
+        if (!hasCachedRenderer)
+        {
+            cachedRenderer = GetComponent<Renderer>();
+            if (cachedRenderer == null)
+            {
+                cachedRenderer = GetComponentInChildren<Renderer>(true);
+            }
+            hasCachedRenderer = true;
+        }
+        return cachedRenderer == null || cachedRenderer.enabled;
+    }
     private TMP_FontAsset originalTitleFont;
     private TMP_FontAsset originalDescFont;
     private TMP_FontAsset originalButtonFont;
@@ -116,6 +133,8 @@ public class LanguageSwitcher : MonoBehaviour
 
     void Update()
     {
+        if (!IsVisible()) return;
+
 #if ENABLE_INPUT_SYSTEM
         bool pressed = false;
         Vector2 tapPosition = Vector2.zero;
@@ -150,16 +169,31 @@ public class LanguageSwitcher : MonoBehaviour
 
     private void CheckRaycastHit(Vector2 screenPoint)
     {
+        if (!IsVisible()) return;
+
         UpdateCamera();
         if (cachedCamera == null) return;
 
         Ray ray = cachedCamera.ScreenPointToRay(screenPoint);
-        RaycastHit[] hits = Physics.RaycastAll(ray, 50f);
-        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        int hitCount = Physics.RaycastNonAlloc(ray, s_RaycastHits, 50f);
+        if (hitCount <= 0) return;
 
-        for (int i = 0; i < hits.Length; i++)
+        // In-place insertion sort by distance to avoid GC allocation
+        for (int i = 1; i < hitCount; i++)
         {
-            if (hits[i].transform == transform || hits[i].transform.IsChildOf(transform))
+            RaycastHit key = s_RaycastHits[i];
+            int j = i - 1;
+            while (j >= 0 && s_RaycastHits[j].distance > key.distance)
+            {
+                s_RaycastHits[j + 1] = s_RaycastHits[j];
+                j--;
+            }
+            s_RaycastHits[j + 1] = key;
+        }
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            if (s_RaycastHits[i].transform == transform || s_RaycastHits[i].transform.IsChildOf(transform))
             {
                 ToggleLanguage();
                 break;
@@ -174,8 +208,80 @@ public class LanguageSwitcher : MonoBehaviour
 
     public void ToggleLanguage()
     {
+        TriggerButtonFeedback();
         currentLanguageIndex = (currentLanguageIndex + 1) % 3;
         ApplyLanguage(currentLanguageIndex);
+    }
+
+    private Coroutine pressCoroutine;
+    private Vector3 initialButtonScale;
+    private bool hasInitialButtonScale = false;
+
+    private void EnsureInitialScale()
+    {
+        if (!hasInitialButtonScale)
+        {
+            initialButtonScale = transform.localScale;
+            hasInitialButtonScale = true;
+        }
+    }
+
+    void OnDisable()
+    {
+        if (hasInitialButtonScale)
+        {
+            transform.localScale = initialButtonScale;
+        }
+        pressCoroutine = null;
+    }
+
+    private void TriggerButtonFeedback()
+    {
+        EnsureInitialScale();
+
+        // 1. Audio feedback
+        if (ARAudioManager.Instance != null)
+        {
+            ARAudioManager.Instance.PlayButtonClick();
+        }
+
+        // 2. Mobile haptic feedback
+#if UNITY_ANDROID || UNITY_IOS
+        try
+        {
+            Handheld.Vibrate();
+        }
+        catch {}
+#endif
+
+        // 3. Tactile 3D spring depression animation
+        if (gameObject.activeInHierarchy)
+        {
+            if (pressCoroutine != null)
+            {
+                StopCoroutine(pressCoroutine);
+            }
+            pressCoroutine = StartCoroutine(AnimateButtonPress());
+        }
+    }
+
+    private System.Collections.IEnumerator AnimateButtonPress()
+    {
+        EnsureInitialScale();
+        float elapsed = 0f;
+        float duration = 0.14f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            float squash = 1f - 0.12f * Mathf.Sin(t * Mathf.PI);
+            transform.localScale = initialButtonScale * squash;
+            yield return null;
+        }
+
+        transform.localScale = initialButtonScale;
+        pressCoroutine = null;
     }
 
     public void ApplyLanguage(int index)

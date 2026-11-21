@@ -67,6 +67,23 @@ public class RotateOnDrag : MonoBehaviour
     private float previousPinchDistance = 0f;
     private bool isPinching = false;
 
+    private Renderer cachedTargetRenderer;
+    private bool hasCachedTargetRenderer = false;
+
+    private bool IsModelVisible()
+    {
+        if (!hasCachedTargetRenderer)
+        {
+            cachedTargetRenderer = GetComponent<Renderer>();
+            if (cachedTargetRenderer == null)
+            {
+                cachedTargetRenderer = GetComponentInChildren<Renderer>(true);
+            }
+            hasCachedTargetRenderer = true;
+        }
+        return cachedTargetRenderer == null || cachedTargetRenderer.enabled;
+    }
+
     /// <summary>
     /// Current dragging state (useful for external scripts or unit tests).
     /// </summary>
@@ -76,6 +93,10 @@ public class RotateOnDrag : MonoBehaviour
     {
         initialScale = transform.localScale;
         EnsureCollider();
+        if (GetComponent<SmoothCardReveal>() == null)
+        {
+            gameObject.AddComponent<SmoothCardReveal>();
+        }
     }
 
     void Start()
@@ -133,6 +154,15 @@ public class RotateOnDrag : MonoBehaviour
 
     void Update()
     {
+        if (!IsModelVisible())
+        {
+            if (isDragging)
+            {
+                EndDrag();
+            }
+            return;
+        }
+
         UpdateCamera();
 
         // Check for 2-finger pinch on mobile or mouse scroll in Editor
