@@ -12,6 +12,26 @@ public class FaceCamera : MonoBehaviour
     protected Vector3 initialLocalPos;
     protected bool hasInitialPos = false;
 
+    // Cache the Camera transform to avoid repeated Camera.main overhead across all instances
+    private static Camera cachedMainCamera;
+    private static Transform cachedMainCameraTransform;
+
+    public static Transform MainCameraTransform
+    {
+        get
+        {
+            if (cachedMainCameraTransform == null || cachedMainCamera == null || !cachedMainCamera.isActiveAndEnabled)
+            {
+                cachedMainCamera = Camera.main;
+                if (cachedMainCamera != null)
+                {
+                    cachedMainCameraTransform = cachedMainCamera.transform;
+                }
+            }
+            return cachedMainCameraTransform;
+        }
+    }
+
     protected virtual void Start()
     {
         if (!hasInitialPos)
@@ -39,10 +59,14 @@ public class FaceCamera : MonoBehaviour
             transform.localPosition = initialLocalPos + new Vector3(0, yOffset, 0);
         }
 
-        // Always face Main Camera
-        if (faceCamera && Camera.main != null)
+        // Always face Main Camera (using cached camera transform)
+        if (faceCamera)
         {
-            transform.rotation = Camera.main.transform.rotation;
+            Transform camTransform = MainCameraTransform;
+            if (camTransform != null)
+            {
+                transform.rotation = camTransform.rotation;
+            }
         }
     }
 }

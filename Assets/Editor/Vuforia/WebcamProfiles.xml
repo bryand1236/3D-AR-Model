@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<profiles>
+    <default>
+        <windows>
+            <requestedTextureWidth>1280</requestedTextureWidth>
+            <requestedTextureHeight>720</requestedTextureHeight>
+            <resampledTextureWidth>1280</resampledTextureWidth>
+        </windows>
+        <osx>
+            <requestedTextureWidth>1280</requestedTextureWidth>
+            <requestedTextureHeight>720</requestedTextureHeight>
+            <resampledTextureWidth>1280</resampledTextureWidth>
+        </osx>
+    </default>
+    <webcam deviceName="USB2.0 HD UVC WebCam">
+        <windows>
+            <requestedTextureWidth>1280</requestedTextureWidth>
+            <requestedTextureHeight>720</requestedTextureHeight>
+            <resampledTextureWidth>1280</resampledTextureWidth>
+        </windows>
+    </webcam>
+</profiles>

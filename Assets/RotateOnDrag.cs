@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Makes a 3D model interactable by rotating it when dragged horizontally from side to side,
-/// with support for smooth automatic idle rotation (e.g. 3 degrees every 6 seconds).
+/// with support for smooth automatic idle rotation, and two-finger pinch-to-scale (plus mouse scroll wheel in Editor).
 /// Works with both touch on mobile and mouse in the Editor.
 /// </summary>
 public class RotateOnDrag : MonoBehaviour
@@ -36,6 +36,19 @@ public class RotateOnDrag : MonoBehaviour
     [Tooltip("How quickly momentum slows down after release.")]
     public float inertiaDamping = 5.0f;
 
+    [Header("Scale / Pinch Settings")]
+    [Tooltip("Enable two-finger pinch to scale (and mouse scroll in Editor).")]
+    public bool enablePinchToScale = true;
+
+    [Tooltip("Pinch scaling sensitivity.")]
+    public float pinchSensitivity = 0.002f;
+
+    [Tooltip("Minimum scale multiplier relative to initial scale.")]
+    public float minScaleMultiplier = 0.5f;
+
+    [Tooltip("Maximum scale multiplier relative to initial scale.")]
+    public float maxScaleMultiplier = 2.5f;
+
     [Header("Interaction Settings")]
     [Tooltip("If true, dragging must start by touching/clicking on the model. If false, dragging anywhere on screen rotates.")]
     public bool requireTouchOnModel = true;
@@ -49,6 +62,11 @@ public class RotateOnDrag : MonoBehaviour
     private float timeSinceLastDrag = 999f;
     private Camera targetCamera;
 
+    private Vector3 initialScale;
+    private float currentScaleMultiplier = 1.0f;
+    private float previousPinchDistance = 0f;
+    private bool isPinching = false;
+
     /// <summary>
     /// Current dragging state (useful for external scripts or unit tests).
     /// </summary>
@@ -56,6 +74,7 @@ public class RotateOnDrag : MonoBehaviour
 
     void Awake()
     {
+        initialScale = transform.localScale;
         EnsureCollider();
     }
 
@@ -67,6 +86,7 @@ public class RotateOnDrag : MonoBehaviour
     void OnDisable()
     {
         isDragging = false;
+        isPinching = false;
         currentAngularVelocity = 0f;
     }
 
@@ -114,6 +134,17 @@ public class RotateOnDrag : MonoBehaviour
     void Update()
     {
         UpdateCamera();
+
+        // Check for 2-finger pinch on mobile or mouse scroll in Editor
+        if (enablePinchToScale && HandlePinchScaling())
+        {
+            // When pinching, cancel rotation drag so model doesn't spin wildly
+            if (isDragging)
+            {
+                EndDrag();
+            }
+            return;
+        }
 
         bool isPressed = false;
         bool wasPressedThisFrame = false;
@@ -185,7 +216,12 @@ public class RotateOnDrag : MonoBehaviour
             {
                 float step = currentAngularVelocity * Time.deltaTime;
                 transform.Rotate(rotationAxis, step, Space.Self);
+
                 currentAngularVelocity = Mathf.Lerp(currentAngularVelocity, 0f, inertiaDamping * Time.deltaTime);
+                if (Mathf.Abs(currentAngularVelocity) <= 0.01f)
+                {
+                    currentAngularVelocity = 0f;
+                }
             }
             else
             {
@@ -199,6 +235,91 @@ public class RotateOnDrag : MonoBehaviour
                 }
             }
         }
+    }
+
+    private bool HandlePinchScaling()
+    {
+        bool hasPinch = false;
+
+#if ENABLE_INPUT_SYSTEM
+        if (Touchscreen.current != null && Touchscreen.current.touches.Count >= 2)
+        {
+            var t0 = Touchscreen.current.touches[0];
+            var t1 = Touchscreen.current.touches[1];
+
+            if (t0.isInProgress && t1.isInProgress)
+            {
+                Vector2 pos0 = t0.position.ReadValue();
+                Vector2 pos1 = t1.position.ReadValue();
+                float currentDist = Vector2.Distance(pos0, pos1);
+
+                if (!isPinching)
+                {
+                    isPinching = true;
+                    previousPinchDistance = currentDist;
+                }
+                else
+                {
+                    float delta = currentDist - previousPinchDistance;
+                    ApplyScaleDelta(delta * pinchSensitivity);
+                    previousPinchDistance = currentDist;
+                }
+                hasPinch = true;
+            }
+            else
+            {
+                isPinching = false;
+            }
+        }
+        else
+        {
+            isPinching = false;
+
+            // Editor testing support: Mouse scroll wheel
+            if (Mouse.current != null)
+            {
+                float scroll = Mouse.current.scroll.ReadValue().y;
+                if (Mathf.Abs(scroll) > 0.01f)
+                {
+                    ApplyScaleDelta(scroll * 0.001f);
+                    hasPinch = true;
+                }
+            }
+        }
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.touchCount >= 2)
+        {
+            Touch touchZero = Input.GetTouch(0);
+            Touch touchOne = Input.GetTouch(1);
+
+            Vector2 touchZeroPrevPos = touchZero.position - touchZero.deltaPosition;
+            Vector2 touchOnePrevPos = touchOne.position - touchOne.deltaPosition;
+
+            float prevTouchDeltaMag = (touchZeroPrevPos - touchOnePrevPos).magnitude;
+            float touchDeltaMag = (touchZero.position - touchOne.position).magnitude;
+
+            float deltaMagnitudeDiff = touchDeltaMag - prevTouchDeltaMag;
+            ApplyScaleDelta(deltaMagnitudeDiff * pinchSensitivity);
+            hasPinch = true;
+        }
+        else
+        {
+            float scroll = Input.GetAxis("Mouse ScrollWheel");
+            if (Mathf.Abs(scroll) > 0.01f)
+            {
+                ApplyScaleDelta(scroll * 0.5f);
+                hasPinch = true;
+            }
+        }
+#endif
+
+        return hasPinch;
+    }
+
+    private void ApplyScaleDelta(float delta)
+    {
+        currentScaleMultiplier = Mathf.Clamp(currentScaleMultiplier + delta, minScaleMultiplier, maxScaleMultiplier);
+        transform.localScale = initialScale * currentScaleMultiplier;
     }
 
     private void StartDrag(Vector2 pointerPos)
@@ -234,7 +355,7 @@ public class RotateOnDrag : MonoBehaviour
             targetCamera = Camera.main;
             if (targetCamera == null)
             {
-                targetCamera = FindAnyObjectByType<Camera>();
+                targetCamera = Object.FindAnyObjectByType<Camera>();
             }
         }
     }
@@ -244,7 +365,7 @@ public class RotateOnDrag : MonoBehaviour
         if (targetCamera == null) return false;
 
         Ray ray = targetCamera.ScreenPointToRay(screenPos);
-        if (Physics.Raycast(ray, out RaycastHit hit))
+        if (Physics.Raycast(ray, out RaycastHit hit, 20f))
         {
             if (hit.transform == transform || hit.transform.IsChildOf(transform))
             {

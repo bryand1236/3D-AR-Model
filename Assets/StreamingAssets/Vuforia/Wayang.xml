@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <QCARConfig>
   <Tracking>
+    <ImageTarget name="rahwana" size="0.085000 0.113839" />
+    <ImageTarget name="karna" size="0.085000 0.113839" />
+    <ImageTarget name="gareng" size="0.085000 0.113839" />
     <ImageTarget name="puntadewa" size="0.085000 0.113839" />
     <ImageTarget name="petruk" size="0.085000 0.113839" />
     <ImageTarget name="hanoman" size="0.085000 0.113839" />
